@@ -1,77 +1,45 @@
 import Home from "./pages/Home";
 // @ts-ignore
 import TawkMessengerReact from '@tawk.to/tawk-messenger-react';
+import { useRef } from "react";
 
 function App() {
-  const hideTawkBranding = () => {
-    const parentStyleId = "hide-tawk-branding-style";
+  const intervalRef = useRef<number | null>(null);
 
+  const hideTawkBranding = () => {
+    // 1. Inject parent style once to push the iframe down and clip the branding
+    const parentStyleId = "hide-tawk-branding-style";
     if (!document.getElementById(parentStyleId)) {
       const style = document.createElement("style");
       style.id = parentStyleId;
       style.textContent = `
-        a[href*="tawk.to"],
-        a[href*="tawt.ai"],
-        .tawk-branding,
-        .tawk-footer,
-        .powered-by-tawk {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          height: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-        iframe[title*="chat"] {
-          height: calc(100% + 16px) !important;
+        /* Target the chat widget iframe container */
+        iframe[title*="chat"], iframe[src*="tawk.to"] {
+          bottom: -15px !important;
+          height: calc(100% + 15px) !important;
         }
       `;
       document.head.appendChild(style);
     }
 
-    const tryHideIframeBranding = () => {
-      const iframe = document.querySelector('iframe[title*="chat"], iframe[src*="tawk"]');
-      if (!iframe) {
-        return;
+    // 2. Clear any existing interval to prevent memory leaks
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    // 3. Continuously re-apply style properties if Tawk's script resets them
+    intervalRef.current = window.setInterval(() => {
+      const iframe = document.querySelector('iframe[title*="chat"], iframe[src*="tawk"]') as HTMLElement;
+      if (iframe) {
+        iframe.style.setProperty("bottom", "-15px", "important");
+        iframe.style.setProperty("height", "calc(100% + 15px)", "important");
       }
+    }, 300);
 
-      try {
-        const doc = (iframe as HTMLIFrameElement).contentDocument;
-        if (doc) {
-          const innerStyleId = "hide-tawk-branding-inner";
-          if (!doc.getElementById(innerStyleId)) {
-            const style = doc.createElement("style");
-            style.id = innerStyleId;
-            style.textContent = `
-              a[href*="tawk.to"],
-              a[href*="tawt.ai"],
-              .tawk-branding,
-              .tawk-footer,
-              .powered-by-tawk {
-                display: none !important;
-              }
-            `;
-            doc.head.appendChild(style);
-          }
-        }
-      } catch {
-        const iframeEl = iframe as HTMLElement;
-        iframeEl.style.height = "calc(100% + 16px)";
-        iframeEl.style.overflow = "hidden";
-        if (iframeEl.parentElement) {
-          iframeEl.parentElement.style.overflow = "hidden";
-        }
-      }
-    };
-
-    const interval = window.setInterval(() => {
-      hideTawkBranding();
-      tryHideIframeBranding();
-    }, 500);
-
+    // 4. Stop checking after 10 seconds once widget is fully stabilized
     window.setTimeout(() => {
-      window.clearInterval(interval);
-    }, 6000);
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
+    }, 10000);
   };
 
   return (
